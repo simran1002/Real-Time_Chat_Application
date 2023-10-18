@@ -3,7 +3,7 @@
 // Get DOM elements in respective Js variables
  const form = document.getElementById('send-container');
  const messageInput = document.getElementById('messageInp');
- const messagecontainer = document.querySelector(".container")
+ const messageContainer = document.querySelector(".container")
 
  //Audio that will play on receiving messages
  var audio = new Audio('messageAudio.wav');
@@ -11,7 +11,7 @@
 
  //Function which will append event info to the container
 const append = (message, position) => {
-    const messageElement = document.createElemeent('div');
+    const messageElement = document.createElement('div');
     messageElement.innerText = message;
     messageElement.classList.add('message');
     messageElement.classList.add(position);
@@ -27,12 +27,12 @@ socket.emit('new-user-joined', name);
 
 //If a new user joins, receive the event from the server
 socket.on('user-joined', data => {
-    append(`${name} joined the chat`, 'right')
+    append(`${data} joined the chat`, 'right');
 });
 
 //If the server sends a message, receive it
 socket.on('receive', data => {
-    append(`${data.user}: ${data.message}`, 'left')
+    append(`${data.user}: ${data.message}`, 'left');
 });
 
 //If a user leaves the chat, append the info to the container

@@ -1,13 +1,24 @@
-const express = require('express');
-const app = express();
-const socket = require('socket.io');
-const port = 8000; 
+//Node Server which will handle socket io connections
+const io = require('socket.io')(8000)
 
+const users={};
 
-app.get('/', (req, res) => {
-    res.send('Hii, I am here to chat with you!!');
-});
+io.on('connection', socket =>{
+    //If any new user joins, let other users connected to the server know!
+    socket.on('new-user-joined', name =>{
+        users[socket.id]=name;
+        socket.broadcast.emit('user-joined', name);
+    });
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
+    //If someone sends a message, broadcast it to other people
+    socket.on('send', message =>{
+        socket.broadcast.emit('receive',{message: message, name: users[socket.id]})
+    });
+
+    // If someone leaves the chat, let others know
+    socket.on('discount', message => {
+        socket.broadcast.emit('left', users[socket.id]);
+        delete users[socket.id];
+    });
+
+})

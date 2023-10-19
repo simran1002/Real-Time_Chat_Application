@@ -22,7 +22,7 @@ const append = (message, position) => {
 }
 
 //Ask new user for his/her name and let the server know
-const name = prompt("Enter your name to join");
+const name = prompt("Enter your name to join the chat");
 socket.emit('new-user-joined', name);
 
 //If a new user joins, receive the event from the server

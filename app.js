@@ -1,12 +1,11 @@
 require("dotenv").config();
 
 const express = require('express');
+const session = require('express-session');
 const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const { connectDB } = require("./db/connection");
-const server = http.createServer(app);
-const express = require('express');
 const passport = require('passport');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -15,24 +14,38 @@ const messages = require('./models/Message');
 
 const app = express();
 app.use(express.json());
-passport.use(User.createStrategy());
 
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+app.use(session({ secret: process.env.SECRET_KEY, resave: false, saveUninitialized: false }));
+app.use(passport.initialize());
+app.use(passport.session());
+
+const path = require('path');
+
+// ...
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
+
+
+// // passport.use(User.createStrategy());
+
+// passport.serializeUser(User.serializeUser());
+// passport.deserializeUser(User.deserializeUser());
 
 app.post('/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Username already exists' });
+    // Check if both username and password are provided
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
     }
 
+    // Hash the password manually using bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = new User({ username, password: hashedPassword });
-    await newUser.save();
+    // Create a new user with the hashed password
+    await User.create({ username, password: hashedPassword });
 
     res.status(201).json({ message: 'User created successfully' });
   } catch (error) {
@@ -42,15 +55,33 @@ app.post('/signup', async (req, res) => {
 });
 
 
-app.post('/login', passport.authenticate('local', { session: false }), (req, res) => {
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
   try {
-    const token = jwt.sign({ userId: req.user._id }, 'your_secret_key_here', { expiresIn: '1h' });
-    res.json({ token });
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).json({ message: 'Login unsuccessful' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      const err = new Error('Enter the correct password');
+      err.status = 401;
+      throw err;
+    }
+
+    // Generate JWT token upon successful login
+    const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY, { expiresIn: '1h' });
+
+    // Send the token as a JSON response
+    res.status(200).json({ message: 'Login successful', token });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(error.status || 500).json({ message: error.message || 'Internal server error' });
   }
 });
+
+
 
 app.post('/logout', (req, res) => {
   // Implement logout logic as needed (e.g., destroying session, revoking tokens)
@@ -77,22 +108,6 @@ const requireAuth = (req, res, next) => {
   }
 };
 
-// Example of a protected route
-app.get('/protected', requireAuth, (req, res) => {
-  res.json({ message: 'You have access to this protected route!' });
-});
-
-// Socket.io logic for real-time chat and status update
-
-const io = require('socket.io')(8000, {
-    cors: {
-      origin: 'http://127.0.0.1:5500',
-      methods: ['GET', 'POST'],
-    },
-  });
-  
-const users={};
-
 // io.on('connection', socket =>{
 //     socket.on('new-user-joined', name =>{
 //         users[socket.id]=name;
@@ -108,6 +123,18 @@ const users={};
 //     });
 
 // })
+
+// Socket.io logic for real-time chat and status update
+
+const io = require('socket.io')(8000, {
+  cors: {
+    origin: 'http://127.0.0.1:5500',
+    methods: ['GET', 'POST'],
+  },
+});
+
+const users={};
+
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -168,6 +195,6 @@ io.on('connection', (socket) => {
 
 // Start the server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+app.listen(PORT, () => {
    console.log(`Server is running on port ${PORT}`);
 });
